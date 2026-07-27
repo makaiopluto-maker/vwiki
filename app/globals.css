@@ -1,0 +1,356 @@
+:root {
+  --paper: #f6f1e7;
+  --paper-alt: #efe7d8;
+  --card: #fffdf7;
+  --ink: #241f1a;
+  --ink-soft: #6b6055;
+  --line: #ddd0b8;
+  --accent: #d9603b;
+  --accent-ink: #ffffff;
+  --sage: #5c7a5e;
+  --gold: #c99a3d;
+  --shadow: 6px 6px 0 rgba(36, 31, 26, 0.08);
+
+  --font-kr: "PretendardVariable", "Pretendard", system-ui, sans-serif;
+  --font-serif: "Noto Serif KR", serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  background-color: var(--paper);
+  background-image: radial-gradient(
+      circle at 1px 1px,
+      rgba(36, 31, 26, 0.05) 1px,
+      transparent 0
+    );
+  background-size: 22px 22px;
+  color: var(--ink);
+  font-family: var(--font-kr);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+}
+
+/* ---------- Live ticker → 종이 배너 느낌 ---------- */
+
+.ticker {
+  background: var(--ink);
+  overflow: hidden;
+  white-space: nowrap;
+  padding: 9px 0;
+}
+
+.ticker-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 28px;
+  animation: ticker-scroll 11s linear infinite;
+  font-family: var(--font-serif);
+  font-size: 13.5px;
+  letter-spacing: 0.01em;
+  color: var(--paper);
+}
+
+.ticker:hover .ticker-inner {
+  animation-play-state: paused;
+}
+
+@keyframes ticker-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.live-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-right: 8px;
+}
+
+/* ---------- Header ---------- */
+
+.site-header {
+  padding: 32px 24px 22px;
+  max-width: 1080px;
+  margin: 0 auto;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  border-bottom: 2px solid var(--ink);
+}
+
+.brand {
+  font-family: var(--font-serif);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.brand-mark {
+  color: var(--accent);
+}
+
+.brand-sub {
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+/* ---------- Layout ---------- */
+
+.container {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 24px 90px;
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 22px 0 30px;
+}
+
+.filter-chip {
+  border: 1.5px solid var(--ink);
+  background: var(--card);
+  color: var(--ink);
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: transform 0.1s ease, background 0.15s ease;
+}
+
+.filter-chip:hover {
+  transform: translateY(-1px);
+}
+
+.filter-chip[data-active="true"] {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+/* ---------- Grid / Cards (인덱스카드 느낌) ---------- */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 22px;
+}
+
+.card {
+  position: relative;
+  background: var(--card);
+  border: 1.5px solid var(--ink);
+  border-radius: 4px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.card:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 8px 8px 0 rgba(36, 31, 26, 0.12);
+}
+
+/* washi tape 포인트 */
+.card::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: 20px;
+  width: 46px;
+  height: 18px;
+  background: var(--card-accent, var(--accent));
+  opacity: 0.85;
+  transform: rotate(-3deg);
+  border-radius: 2px;
+}
+
+.card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 10px;
+  margin-top: 4px;
+}
+
+.card-name {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.card-agency {
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  margin-top: 2px;
+}
+
+.status-badge {
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.card-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 10px 0 14px;
+}
+
+.tag {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  background: var(--paper-alt);
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+}
+
+.platform-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.platform-btn {
+  font-size: 12px;
+  padding: 6px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  background: var(--paper);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.platform-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+/* ---------- Detail page ---------- */
+
+.detail-hero {
+  border: 1.5px solid var(--ink);
+  background: var(--card);
+  border-radius: 4px;
+  padding: 30px;
+  position: relative;
+  box-shadow: var(--shadow);
+  margin: 22px 0 26px;
+}
+
+.detail-hero::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: 26px;
+  width: 56px;
+  height: 20px;
+  background: var(--hero-accent, var(--accent));
+  opacity: 0.85;
+  transform: rotate(-2deg);
+  border-radius: 2px;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  margin-bottom: 16px;
+  border-bottom: 1px dotted var(--ink-soft);
+}
+
+.back-link:hover {
+  color: var(--ink);
+}
+
+.detail-name {
+  font-family: var(--font-serif);
+  font-size: 30px;
+  font-weight: 700;
+  margin: 4px 0 6px;
+}
+
+.detail-meta {
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+.section-title {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  color: var(--ink);
+  letter-spacing: 0.01em;
+  margin: 30px 0 12px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--ink);
+  display: inline-block;
+}
+
+.namu-box {
+  border: 1.5px solid var(--line);
+  border-left: 4px solid var(--sage);
+  background: var(--paper-alt);
+  border-radius: 4px;
+  padding: 16px 18px;
+}
+
+.namu-excerpt {
+  font-size: 14.5px;
+  line-height: 1.75;
+  color: var(--ink);
+}
+
+.namu-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.namu-footer a {
+  color: var(--sage);
+  border-bottom: 1px dotted var(--sage);
+}
+
+.empty-state {
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  padding: 70px 0;
+  text-align: center;
+}

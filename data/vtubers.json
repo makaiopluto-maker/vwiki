@@ -1,0 +1,43 @@
+[
+  {
+    "id": "example-member-01",
+    "name": "예시버튜버",
+    "nameEn": "Example Vtuber",
+    "agency": "예시 소속사",
+    "debutDate": "2023-05-01",
+    "status": "active",
+    "tags": ["게임", "노래"],
+    "avatar": "",
+    "color": "#7C5CFF",
+    "platforms": {
+      "youtube": "https://www.youtube.com/@example",
+      "chzzk": "https://chzzk.naver.com/example",
+      "twitter": "https://twitter.com/example"
+    },
+    "namu": {
+      "url": "https://namu.wiki/w/예시버튜버",
+      "excerpt": "",
+      "fetchedAt": null
+    }
+  },
+  {
+    "id": "example-member-02",
+    "name": "예시버튜버2",
+    "nameEn": "Example Vtuber 2",
+    "agency": "예시 소속사",
+    "debutDate": "2024-02-14",
+    "status": "active",
+    "tags": ["방송", "잡담"],
+    "avatar": "",
+    "color": "#00E6A8",
+    "platforms": {
+      "chzzk": "https://chzzk.naver.com/example2",
+      "twitch": "https://twitch.tv/example2"
+    },
+    "namu": {
+      "url": "https://namu.wiki/w/예시버튜버2",
+      "excerpt": "",
+      "fetchedAt": null
+    }
+  }
+]

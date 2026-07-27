@@ -1,0 +1,23 @@
+name: Update Namuwiki Excerpts
+
+on:
+  schedule:
+    - cron: "0 18 * * *" # 매일 UTC 18:00 (KST 새벽 3시)
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm install firebase-admin
+
+      - name: 나무위키 개요 발췌 갱신 (Firestore에 직접 반영)
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: node scripts/fetch-namu-excerpt.mjs
