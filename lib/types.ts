@@ -22,6 +22,7 @@ export interface VtuberEntry {
     url: string;
     excerpt: string;
     fetchedAt: string | null;
+    profile?: Record<string, string>; // 성별/나이/생일 등 사실 정보 (표 형태)
   };
 }
 
@@ -50,4 +51,3 @@ export interface RequestEntry {
   note?: string;
   createdAt: number; // epoch ms
 }
-
