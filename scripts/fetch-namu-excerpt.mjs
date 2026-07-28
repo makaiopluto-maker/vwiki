@@ -1,19 +1,17 @@
 // Firestore의 vtubers 컬렉션을 돌면서 나무위키 "짧은 개요 발췌"만 채워넣는 스크립트.
 // - CC BY-NC-SA 2.0 KR 라이선스 준수를 위해 문서 전체가 아니라
-//   앞부분 텍스트를 최대 EXCERPT_MAX_LEN 글자까지만 잘라서 저장합니다.
+//   "개요" 섹션(도입부 한 단락)까지만 가져와서 저장합니다.
 // - 매 요청 사이에 딜레이를 둬서 나무위키 서버에 부담을 주지 않습니다.
 //
-// 실행 전 준비물 (GitHub Actions에서 자동 실행되도록 이미 구성되어 있음):
-// - GitHub Secrets에 FIREBASE_SERVICE_ACCOUNT 라는 이름으로
-//   서비스 계정 JSON 전체 내용을 등록해야 합니다.
-// - 로컬에서 테스트하려면 프로젝트 루트에 serviceAccountKey.json을 두고
-//   FIREBASE_SERVICE_ACCOUNT 환경변수 없이 실행하면 그 파일을 대신 읽습니다.
+// 로컬에서 테스트하려면 프로젝트 루트에 serviceAccountKey.json을 두고 실행:
+//   npm run fetch-namu
 
 import { readFile } from "fs/promises";
 import { initializeApp, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 
-const EXCERPT_MAX_LEN = 220; // 라이선스 안전을 위해 짧게 유지
+const EXCERPT_MAX_LEN = 220; // og:description/폴백용 짧은 발췌 길이 제한
+const OVERVIEW_MAX_LEN = 500; // "개요" 섹션 전용 - 조금 더 길게 허용 (여전히 문서 일부일 뿐)
 const REQUEST_DELAY_MS = 1500; // 요청 사이 딜레이 (서버 부담 방지)
 
 function sleep(ms) {
@@ -30,9 +28,7 @@ function decodeEntities(str) {
     .replace(/&nbsp;/g, " ");
 }
 
-/** 나무위키 페이지의 og:description 메타태그에서 짧은 요약을 가져옴.
- *  이 값은 나무위키가 SNS 공유용으로 미리 만들어둔 깔끔한 요약이라
- *  본문을 직접 긁는 것보다 훨씬 안정적임 (편집 안내문/메뉴 텍스트 안 섞임). */
+/** 나무위키 페이지의 og:description 메타태그에서 짧은 요약을 가져옴. */
 function extractOgDescription(html) {
   const metaTags = html.match(/<meta[^>]+>/gi) || [];
   for (const tag of metaTags) {
@@ -42,6 +38,34 @@ function extractOgDescription(html) {
     }
   }
   return null;
+}
+
+/** 나무위키 문서의 "개요" 섹션(첫 번째 소제목 문단) 본문만 추출.
+ *  edit 링크의 section=1(개요) ~ section=2(다음 문단) 사이 텍스트를 잘라냄. */
+function extractOverviewSection(html) {
+  const startIdx = html.search(/section=1["']/i);
+  const endIdx = html.search(/section=2["']/i);
+  if (startIdx === -1 || endIdx === -1 || endIdx <= startIdx) return null;
+
+  const afterStart = html.slice(startIdx);
+  const anchorCloseIdx = afterStart.search(/<\/a>/i);
+  if (anchorCloseIdx === -1) return null;
+  const sectionHtml = html.slice(startIdx + anchorCloseIdx, endIdx);
+
+  const text = sectionHtml
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const cleaned = decodeEntities(text)
+    .replace(/\s*\d\.\s*$/, "")
+    .trim();
+
+  if (cleaned.length < 5) return null;
+  return cleaned;
 }
 
 async function fetchExcerpt(namuUrl) {
@@ -60,10 +84,12 @@ async function fetchExcerpt(namuUrl) {
   }
   const html = await res.text();
 
+  const overview = extractOverviewSection(html);
+  if (overview) return overview.slice(0, OVERVIEW_MAX_LEN);
+
   const ogDesc = extractOgDescription(html);
   if (ogDesc) return ogDesc.slice(0, EXCERPT_MAX_LEN);
 
-  // og:description이 없는 예외적인 경우를 위한 폴백 (예전 방식)
   const text = html
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
