@@ -58,9 +58,10 @@ function extractOverviewSection(html) {
   }
 
   const afterStart = html.slice(startMarker);
-  const anchorCloseRel = afterStart.search(/<\/a>/i);
-  const contentStart =
-    anchorCloseRel === -1 ? startMarker : startMarker + anchorCloseRel + 4;
+  const headingCloseMatch = afterStart.match(/<\/h[1-6]>/i);
+  const contentStart = headingCloseMatch
+    ? startMarker + headingCloseMatch.index + headingCloseMatch[0].length
+    : startMarker;
 
   const endTagOpen = html.lastIndexOf("<", endMarker);
   const contentEnd = endTagOpen === -1 ? endMarker : endTagOpen;
