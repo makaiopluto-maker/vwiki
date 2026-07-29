@@ -9,13 +9,13 @@ export default function PlatformLinks({
   const entries = Object.entries(platforms) as [Platform, string][];
 
   if (entries.length === 0) {
-    return <span style={{ color: "var(--ink-soft)", fontSize: 12.5 }}>등록된 링크 없음</span>;
+    return null;
   }
 
   return (
     <div className="platform-row">
       {entries.map(([platform, url]) => (
-        <a
+        
           key={platform}
           className="platform-btn"
           href={url}

@@ -19,9 +19,29 @@ export default function VtuberCard({
   return (
     <div className="card" style={{ ["--card-accent" as any]: vtuber.color }}>
       <div className="card-top">
-        <Link href={`/vtuber/?id=${vtuber.id}`} style={{ flex: 1 }}>
-          <div className="card-name">{vtuber.name}</div>
-          <div className="card-agency">{vtuber.agency}</div>
+        <Link
+          href={`/vtuber/?id=${vtuber.id}`}
+          style={{ flex: 1, display: "flex", gap: 10, alignItems: "center" }}
+        >
+          {vtuber.avatar && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={vtuber.avatar}
+              alt=""
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: "50%",
+                objectFit: "cover",
+                border: "1px solid var(--line)",
+                flexShrink: 0,
+              }}
+            />
+          )}
+          <div>
+            <div className="card-name">{vtuber.name}</div>
+            <div className="card-agency">{vtuber.agency}</div>
+          </div>
         </Link>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <FavoriteButton vtuberId={vtuber.id} favorited={favorited} />

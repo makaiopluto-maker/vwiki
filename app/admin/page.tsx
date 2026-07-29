@@ -41,10 +41,11 @@ export default function AdminPage() {
   const [form, setForm] = useState<VtuberEntry>(EMPTY);
   const [tagsInput, setTagsInput] = useState("");
   const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   const [quickName, setQuickName] = useState("");
   const [quickNamu, setQuickNamu] = useState("");
-  const [quickYoutube, setQuickYoutube] = useState("");
+  const [quickAvatar, setQuickAvatar] = useState("");
   const [quickSaving, setQuickSaving] = useState(false);
   const [quickDone, setQuickDone] = useState(false);
 
@@ -94,11 +95,13 @@ export default function AdminPage() {
   const startEdit = (v: VtuberEntry) => {
     setForm(v);
     setTagsInput(v.tags.join(", "));
+    setEditing(true);
   };
 
   const resetForm = () => {
     setForm(EMPTY);
     setTagsInput("");
+    setEditing(false);
   };
 
   const importFromRequest = (r: RequestEntry) => {
@@ -116,6 +119,7 @@ export default function AdminPage() {
       namu: { url: r.namuUrl ?? "", excerpt: "", fetchedAt: null },
     });
     setTagsInput("");
+    setEditing(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -155,13 +159,13 @@ export default function AdminPage() {
         ...EMPTY,
         id,
         name: quickName.trim(),
+        avatar: quickAvatar.trim() || undefined,
         color: COLOR_PALETTE[Math.floor(Math.random() * COLOR_PALETTE.length)],
-        platforms: { youtube: quickYoutube.trim() || undefined },
         namu: { url: quickNamu.trim(), excerpt: "", fetchedAt: null },
       });
       setQuickName("");
       setQuickNamu("");
-      setQuickYoutube("");
+      setQuickAvatar("");
       setQuickDone(true);
       setTimeout(() => setQuickDone(false), 4000);
     } catch (err: any) {
@@ -216,9 +220,9 @@ export default function AdminPage() {
           <input
             className="filter-chip"
             style={{ flex: "2 1 220px", cursor: "text" }}
-            placeholder="유튜브 링크 (선택)"
-            value={quickYoutube}
-            onChange={(e) => setQuickYoutube(e.target.value)}
+            placeholder="프로필 이미지 URL (선택)"
+            value={quickAvatar}
+            onChange={(e) => setQuickAvatar(e.target.value)}
           />
           <button
             className="filter-chip"
@@ -246,136 +250,147 @@ export default function AdminPage() {
         )}
       </div>
 
-      <div className="detail-hero">
-        <div className="section-title" style={{ marginTop: 0 }}>
-          {form.id ? `세부 수정: ${form.id}` : "세부 정보 직접 입력 (선택)"}
-        </div>
-        <a
-          href="https://github.com/makaiopluto-maker/vwiki/actions/workflows/update-namu-excerpts.yml"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="filter-chip"
-          style={{ display: "inline-block", marginBottom: 16 }}
-        >
-          나무위키 개요 지금 갱신하기 (GitHub Actions) →
-        </a>
-        <div className="brand-sub" style={{ marginBottom: 16 }}>
-          클릭 후 GitHub 화면에서 우측의 "Run workflow" 버튼을 눌러주세요. 1분 정도 걸려요.
-        </div>
+      <a
+        href="https://github.com/makaiopluto-maker/vwiki/actions/workflows/update-namu-excerpts.yml"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="filter-chip"
+        style={{ display: "inline-block", marginBottom: 4 }}
+      >
+        나무위키 개요 지금 갱신하기 (GitHub Actions) →
+      </a>
+      <div className="brand-sub" style={{ marginBottom: 24 }}>
+        클릭 후 GitHub 화면에서 우측의 "Run workflow" 버튼을 눌러주세요. 1분 정도 걸려요.
+      </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <label>
-            <div className="brand-sub">ID (영문 슬러그, 고유값)</div>
-            <input
-              className="filter-chip"
-              style={{ width: "100%", cursor: "text" }}
-              value={form.id}
-              disabled={!!vtubers.find((v) => v.id === form.id) && form.id !== ""}
-              onChange={(e) => setForm((f) => ({ ...f, id: e.target.value }))}
-              placeholder="example-member-01"
-            />
-          </label>
-          <label>
-            <div className="brand-sub">이름</div>
-            <input
-              className="filter-chip"
-              style={{ width: "100%", cursor: "text" }}
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-            />
-          </label>
-          <label>
-            <div className="brand-sub">소속</div>
-            <input
-              className="filter-chip"
-              style={{ width: "100%", cursor: "text" }}
-              value={form.agency}
-              onChange={(e) => setForm((f) => ({ ...f, agency: e.target.value }))}
-            />
-          </label>
-          <label>
-            <div className="brand-sub">데뷔일 (YYYY-MM-DD)</div>
-            <input
-              className="filter-chip"
-              style={{ width: "100%", cursor: "text" }}
-              value={form.debutDate}
-              onChange={(e) => setForm((f) => ({ ...f, debutDate: e.target.value }))}
-            />
-          </label>
-          <label>
-            <div className="brand-sub">상태</div>
-            <select
-              className="filter-chip"
-              style={{ width: "100%" }}
-              value={form.status}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, status: e.target.value as VtuberEntry["status"] }))
-              }
-            >
-              <option value="active">활동 중</option>
-              <option value="hiatus">휴방 중</option>
-              <option value="graduated">졸업</option>
-            </select>
-          </label>
-          <label>
-            <div className="brand-sub">테마 컬러 (hex)</div>
-            <input
-              className="filter-chip"
-              style={{ width: "100%", cursor: "text" }}
-              value={form.color}
-              onChange={(e) => setForm((f) => ({ ...f, color: e.target.value }))}
-            />
-          </label>
-          <label style={{ gridColumn: "1 / -1" }}>
-            <div className="brand-sub">태그 (쉼표로 구분)</div>
-            <input
-              className="filter-chip"
-              style={{ width: "100%", cursor: "text" }}
-              value={tagsInput}
-              onChange={(e) => setTagsInput(e.target.value)}
-              placeholder="게임, 노래, 잡담"
-            />
-          </label>
+      {editing && (
+        <div className="detail-hero">
+          <div className="section-title" style={{ marginTop: 0 }}>
+            세부 수정: {form.id || "(저장 안 됨)"}
+          </div>
 
-          {(["youtube", "chzzk", "twitch", "twitter"] as const).map((p) => (
-            <label key={p}>
-              <div className="brand-sub">{p}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <label>
+              <div className="brand-sub">ID (영문 슬러그, 고유값)</div>
               <input
                 className="filter-chip"
                 style={{ width: "100%", cursor: "text" }}
-                value={form.platforms[p] ?? ""}
-                onChange={(e) => setPlatform(p, e.target.value)}
+                value={form.id}
+                onChange={(e) => setForm((f) => ({ ...f, id: e.target.value }))}
+                placeholder="example-member-01"
               />
             </label>
-          ))}
+            <label>
+              <div className="brand-sub">이름</div>
+              <input
+                className="filter-chip"
+                style={{ width: "100%", cursor: "text" }}
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              />
+            </label>
+            <label>
+              <div className="brand-sub">소속</div>
+              <input
+                className="filter-chip"
+                style={{ width: "100%", cursor: "text" }}
+                value={form.agency}
+                onChange={(e) => setForm((f) => ({ ...f, agency: e.target.value }))}
+              />
+            </label>
+            <label>
+              <div className="brand-sub">데뷔일 (YYYY-MM-DD)</div>
+              <input
+                className="filter-chip"
+                style={{ width: "100%", cursor: "text" }}
+                value={form.debutDate}
+                onChange={(e) => setForm((f) => ({ ...f, debutDate: e.target.value }))}
+              />
+            </label>
+            <label>
+              <div className="brand-sub">상태</div>
+              <select
+                className="filter-chip"
+                style={{ width: "100%" }}
+                value={form.status}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, status: e.target.value as VtuberEntry["status"] }))
+                }
+              >
+                <option value="active">활동 중</option>
+                <option value="hiatus">휴방 중</option>
+                <option value="graduated">졸업</option>
+              </select>
+            </label>
+            <label>
+              <div className="brand-sub">테마 컬러 (hex)</div>
+              <input
+                className="filter-chip"
+                style={{ width: "100%", cursor: "text" }}
+                value={form.color}
+                onChange={(e) => setForm((f) => ({ ...f, color: e.target.value }))}
+              />
+            </label>
+            <label>
+              <div className="brand-sub">프로필 이미지 URL</div>
+              <input
+                className="filter-chip"
+                style={{ width: "100%", cursor: "text" }}
+                value={form.avatar ?? ""}
+                onChange={(e) => setForm((f) => ({ ...f, avatar: e.target.value || undefined }))}
+              />
+            </label>
+            <label style={{ gridColumn: "1 / -1" }}>
+              <div className="brand-sub">태그 (쉼표로 구분)</div>
+              <input
+                className="filter-chip"
+                style={{ width: "100%", cursor: "text" }}
+                value={tagsInput}
+                onChange={(e) => setTagsInput(e.target.value)}
+                placeholder="게임, 노래, 잡담"
+              />
+            </label>
 
-          <label style={{ gridColumn: "1 / -1" }}>
-            <div className="brand-sub">나무위키 URL</div>
-            <input
+            {(["youtube", "chzzk", "twitch", "twitter"] as const).map((p) => (
+              <label key={p}>
+                <div className="brand-sub">{p}</div>
+                <input
+                  className="filter-chip"
+                  style={{ width: "100%", cursor: "text" }}
+                  value={form.platforms[p] ?? ""}
+                  onChange={(e) => setPlatform(p, e.target.value)}
+                />
+              </label>
+            ))}
+
+            <label style={{ gridColumn: "1 / -1" }}>
+              <div className="brand-sub">나무위키 URL</div>
+              <input
+                className="filter-chip"
+                style={{ width: "100%", cursor: "text" }}
+                value={form.namu.url}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, namu: { ...f.namu, url: e.target.value } }))
+                }
+              />
+            </label>
+          </div>
+
+          <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+            <button
               className="filter-chip"
-              style={{ width: "100%", cursor: "text" }}
-              value={form.namu.url}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, namu: { ...f.namu, url: e.target.value } }))
-              }
-            />
-          </label>
+              data-active="true"
+              onClick={handleSave}
+              disabled={saving}
+            >
+              {saving ? "저장 중..." : "저장"}
+            </button>
+            <button className="filter-chip" onClick={resetForm}>
+              취소
+            </button>
+          </div>
         </div>
-
-        <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-          <button
-            className="filter-chip"
-            data-active="true"
-            onClick={handleSave}
-            disabled={saving}
-          >
-            {saving ? "저장 중..." : form.id ? "저장" : "추가"}
-          </button>
-          <button className="filter-chip" onClick={resetForm}>
-            취소 / 새로 만들기
-          </button>
-        </div>
-      </div>
+      )}
 
       <div className="section-title">대기 중인 추가 요청 ({requests.length})</div>
       {requests.length === 0 ? (
@@ -404,7 +419,7 @@ export default function AdminPage() {
                 </span>
                 {r.note && (
                   <div style={{ fontSize: 12.5, color: "var(--ink-soft)", marginTop: 4 }}>
-                    “{r.note}”
+                    "{r.note}"
                   </div>
                 )}
               </div>
