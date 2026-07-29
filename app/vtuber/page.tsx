@@ -7,6 +7,7 @@ import { VtuberEntry } from "@/lib/types";
 import { deleteVtuber, getVtuberById, incrementView } from "@/lib/vtubers-db";
 import PlatformLinks from "@/components/PlatformLinks";
 import NamuExcerpt from "@/components/NamuExcerpt";
+import ProfileTable from "@/components/ProfileTable";
 import Comments from "@/components/Comments";
 import AuthButton from "@/components/AuthButton";
 import { useAuth } from "@/hooks/useAuth";
@@ -59,9 +60,7 @@ function VtuberDetailInner() {
       {vtuber === undefined ? (
         <div className="empty-state">불러오는 중...</div>
       ) : vtuber === null ? (
-        <div className="empty-state">
-          해당 버튜버를 찾을 수 없습니다.
-        </div>
+        <div className="empty-state">해당 버튜버를 찾을 수 없습니다.</div>
       ) : (
         <>
           <div
@@ -100,6 +99,13 @@ function VtuberDetailInner() {
 
           <div className="section-title">방송 플랫폼</div>
           <PlatformLinks platforms={vtuber.platforms} />
+
+          {vtuber.namu.profile && (
+            <>
+              <div className="section-title">프로필</div>
+              <ProfileTable profile={vtuber.namu.profile} />
+            </>
+          )}
 
           <div className="section-title">나무위키 개요</div>
           <NamuExcerpt namu={vtuber.namu} />
