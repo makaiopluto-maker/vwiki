@@ -20,12 +20,17 @@ function sleep(ms) {
 
 function decodeEntities(str) {
   return str
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, num) => String.fromCodePoint(parseInt(num, 10)))
     .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&nbsp;/g, " ");
+}
+
+function stripFootnoteRefs(str) {
+  return str.replace(/\s*\[\d+\]\s*/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function stripTags(html) {
@@ -97,6 +102,35 @@ function extractOverviewSectionFallback(html) {
   return cleaned;
 }
 
+const PROFILE_FIELD_ORDER = [
+  "성별",
+  "종족",
+  "나이",
+  "생일",
+  "신장",
+  "반려동물",
+  "반려묘",
+  "반려견",
+  "MBTI",
+  "소속",
+  "디자인",
+  "Live2D",
+  "오시마크",
+  "팬네임",
+  "데뷔",
+];
+
+function sortProfileFields(profile) {
+  const sorted = {};
+  for (const key of PROFILE_FIELD_ORDER) {
+    if (key in profile) sorted[key] = profile[key];
+  }
+  for (const key of Object.keys(profile)) {
+    if (!(key in sorted)) sorted[key] = profile[key];
+  }
+  return sorted;
+}
+
 function extractProfileTable(html) {
   const startIdx = html.indexOf("PROFILE");
   if (startIdx === -1) return null;
@@ -113,12 +147,12 @@ function extractProfileTable(html) {
     const cells = row.match(/<t[dh][^>]*>[\s\S]*?<\/t[dh]>/gi) || [];
     if (cells.length < 2) continue;
     const label = stripTags(cells[0]);
-    const value = stripTags(cells[1]);
+    const value = stripFootnoteRefs(stripTags(cells[1]));
     if (label && value && label.length <= 10 && value.length <= 120) {
       profile[label] = value;
     }
   }
-  return Object.keys(profile).length ? profile : null;
+  return Object.keys(profile).length ? sortProfileFields(profile) : null;
 }
 
 async function fetchNamuData(namuUrl) {

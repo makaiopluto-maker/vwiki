@@ -1,9 +1,36 @@
+const FIELD_ORDER = [
+  "성별",
+  "종족",
+  "나이",
+  "생일",
+  "신장",
+  "반려동물",
+  "반려묘",
+  "반려견",
+  "MBTI",
+  "소속",
+  "디자인",
+  "Live2D",
+  "오시마크",
+  "팬네임",
+  "데뷔",
+];
+
 export default function ProfileTable({
   profile,
 }: {
   profile?: Record<string, string>;
 }) {
   if (!profile || Object.keys(profile).length === 0) return null;
+
+  const entries = Object.entries(profile).sort(([a], [b]) => {
+    const ai = FIELD_ORDER.indexOf(a);
+    const bi = FIELD_ORDER.indexOf(b);
+    if (ai === -1 && bi === -1) return 0;
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
 
   return (
     <div
@@ -13,7 +40,7 @@ export default function ProfileTable({
         overflow: "hidden",
       }}
     >
-      {Object.entries(profile).map(([label, value], i) => (
+      {entries.map(([label, value], i) => (
         <div
           key={label}
           style={{
