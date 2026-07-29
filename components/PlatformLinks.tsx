@@ -15,7 +15,7 @@ export default function PlatformLinks({
   return (
     <div className="platform-row">
       {entries.map(([platform, url]) => (
-        
+        <a
           key={platform}
           className="platform-btn"
           href={url}
