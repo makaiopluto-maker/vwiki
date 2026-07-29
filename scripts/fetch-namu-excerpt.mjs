@@ -29,6 +29,7 @@ function decodeEntities(str) {
     .replace(/&nbsp;/g, " ");
 }
 
+// "150cm[1]" 처럼 남는 각주 번호 표시를 제거
 function stripFootnoteRefs(str) {
   return str.replace(/\s*\[\d+\]\s*/g, " ").replace(/\s+/g, " ").trim();
 }
@@ -36,7 +37,7 @@ function stripFootnoteRefs(str) {
 function stripTags(html) {
   return decodeEntities(
     html
-      .replace(/<sup[\s\S]*?<\/sup>/gi, " ")
+      .replace(/<sup[\s\S]*?<\/sup>/gi, " ") // 각주 번호 제거
       .replace(/<script[\s\S]*?<\/script>/gi, " ")
       .replace(/<style[\s\S]*?<\/style>/gi, " ")
       .replace(/<[^>]+>/g, " ")
@@ -62,12 +63,15 @@ function extractOverviewSection(html) {
     return extractOverviewSectionFallback(html);
   }
 
+  // 시작: "개요" 제목 태그(<h2>...</h2> 등) 전체가 끝나는 지점부터
+  // (제목 마커 앵커, 제목 글자, [편집] 링크까지 전부 건너뜀)
   const afterStart = html.slice(startMarker);
   const headingCloseMatch = afterStart.match(/<\/h[1-6]>/i);
   const contentStart = headingCloseMatch
     ? startMarker + headingCloseMatch.index + headingCloseMatch[0].length
     : startMarker;
 
+  // 끝: 다음 제목 태그가 "시작"하는 지점 (그 제목의 글자가 아예 포함 안 되게)
   const endTagOpen = html.lastIndexOf("<", endMarker);
   const contentEnd = endTagOpen === -1 ? endMarker : endTagOpen;
 
@@ -78,6 +82,7 @@ function extractOverviewSection(html) {
   return cleaned;
 }
 
+// id="s-1"/"s-2" 마커가 없는 예외적인 페이지를 위한 예전 방식 폴백
 function extractOverviewSectionFallback(html) {
   const startIdx = html.search(/section=1["']/i);
   const endMatchIdx = html.search(/section=2["']/i);
@@ -90,18 +95,21 @@ function extractOverviewSectionFallback(html) {
   if (anchorCloseIdx === -1) return null;
   const contentStart = startIdx + anchorCloseIdx + 4;
 
+  // 태그 중간에서 안 잘리도록, 그 태그가 "시작"하는 지점까지만 사용
   const tagStart = html.lastIndexOf("<", endMatchIdx);
   const contentEnd = tagStart === -1 ? endMatchIdx : tagStart;
   if (contentEnd <= contentStart) return null;
 
   const cleaned = stripTags(html.slice(contentStart, contentEnd))
-    .replace(/\s*\d+\.\s*\S*\s*$/, "")
+    .replace(/\s*\d+\.\s*\S*\s*$/, "") // 다음 제목 번호/제목 잔여물 제거
     .trim();
 
   if (cleaned.length < 5) return null;
   return cleaned;
 }
 
+/** "PROFILE" 표의 성별/나이/생일 등 사실 정보만 key-value로 추출.
+ *  일러스트/서명(SIGNATURE) 이미지는 포함하지 않음. */
 const PROFILE_FIELD_ORDER = [
   "성별",
   "종족",
@@ -155,6 +163,38 @@ function extractProfileTable(html) {
   return Object.keys(profile).length ? sortProfileFields(profile) : null;
 }
 
+/** "SOCIAL" 표에 걸려있는 실제 링크(href)만 도메인으로 구분해서 뽑아냄.
+ *  해시태그처럼 링크가 아닌 텍스트는 대상이 아님 (URL은 사실 정보라 가져와도 문제없음). */
+function extractSocialLinks(html) {
+  const startIdx = html.indexOf("SOCIAL");
+  if (startIdx === -1) return null;
+
+  let endIdx = html.indexOf("SIGNATURE", startIdx);
+  if (endIdx === -1) endIdx = startIdx + 4000;
+
+  const chunk = html.slice(startIdx, endIdx);
+  const hrefs = [...chunk.matchAll(/href=["']([^"']+)["']/gi)].map((m) =>
+    decodeEntities(m[1])
+  );
+
+  const links = {};
+  for (const href of hrefs) {
+    if (/youtube\.com|youtu\.be/i.test(href) && !links.youtube) {
+      links.youtube = href;
+    } else if (/chzzk\.naver\.com/i.test(href) && !links.chzzk) {
+      links.chzzk = href;
+    } else if (/twitch\.tv/i.test(href) && !links.twitch) {
+      links.twitch = href;
+    } else if (/(twitter\.com|x\.com)/i.test(href) && !links.twitter) {
+      links.twitter = href;
+    } else if (/instagram\.com/i.test(href) && !links.instagram) {
+      links.instagram = href;
+    }
+  }
+
+  return Object.keys(links).length ? links : null;
+}
+
 async function fetchNamuData(namuUrl) {
   const res = await fetch(namuUrl, {
     headers: {
@@ -188,8 +228,9 @@ async function fetchNamuData(namuUrl) {
   }
 
   const profile = extractProfileTable(html);
+  const socialLinks = extractSocialLinks(html);
 
-  return { excerpt, profile };
+  return { excerpt, profile, socialLinks };
 }
 
 async function loadCredential() {
@@ -225,11 +266,23 @@ async function main() {
       if (result.profile) {
         update["namu.profile"] = result.profile;
       }
+
+      let addedPlatforms = 0;
+      if (result.socialLinks) {
+        const existing = v.platforms || {};
+        for (const [key, value] of Object.entries(result.socialLinks)) {
+          if (!existing[key]) {
+            update[`platforms.${key}`] = value;
+            addedPlatforms++;
+          }
+        }
+      }
+
       await docSnap.ref.update(update);
       console.log(
         `  ✓ 저장됨 (개요 ${result.excerpt.length}자${
           result.profile ? `, 프로필 ${Object.keys(result.profile).length}개` : ""
-        })`
+        }${addedPlatforms ? `, 플랫폼 링크 ${addedPlatforms}개 추가` : ""})`
       );
     } else {
       console.log(`  ✗ 실패 - 기존 값 유지`);
