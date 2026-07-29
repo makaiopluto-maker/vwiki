@@ -174,7 +174,13 @@ function extractProfileTable(html) {
     if (cells.length < 2) continue;
     const label = stripTags(cells[0]);
     const value = stripFootnoteRefs(stripTags(cells[1]));
-    if (label && value && label.length <= 10 && value.length <= 150) {
+    if (
+      label &&
+      value &&
+      !/^[|\s]+$/.test(value) &&
+      label.length <= 10 &&
+      value.length <= 150
+    ) {
       profile[label] = value;
     }
   }
