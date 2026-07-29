@@ -139,15 +139,33 @@ function sortProfileFields(profile) {
   return sorted;
 }
 
+/** 인포박스 표 범위를 찾음. "PROFILE" 글자가 있는 템플릿과, 글자 없이
+ *  "개요" 제목 바로 앞에 표만 있는 템플릿 둘 다 지원. */
+function locateInfoTableChunk(html) {
+  const profileIdx = html.indexOf("PROFILE");
+  if (profileIdx !== -1) {
+    let endIdx = html.indexOf("SOCIAL", profileIdx);
+    if (endIdx === -1) endIdx = html.indexOf("SIGNATURE", profileIdx);
+    if (endIdx === -1) endIdx = profileIdx + 6000;
+    return html.slice(profileIdx, endIdx);
+  }
+
+  // 폴백: "개요"(id="s-1") 제목 바로 앞에 있는 표를 인포박스로 간주
+  const s1Idx = html.search(/id=["']s-1["']/i);
+  if (s1Idx === -1) return null;
+  const tableStart = html.lastIndexOf("<table", s1Idx);
+  if (tableStart === -1) return null;
+  const afterTableStart = html.slice(tableStart);
+  const tableEndRel = afterTableStart.search(/<\/table>/i);
+  if (tableEndRel === -1) return null;
+  const tableEnd = tableStart + tableEndRel + "</table>".length;
+  return html.slice(tableStart, tableEnd);
+}
+
 function extractProfileTable(html) {
-  const startIdx = html.indexOf("PROFILE");
-  if (startIdx === -1) return null;
+  const chunk = locateInfoTableChunk(html);
+  if (!chunk) return null;
 
-  let endIdx = html.indexOf("SOCIAL", startIdx);
-  if (endIdx === -1) endIdx = html.indexOf("SIGNATURE", startIdx);
-  if (endIdx === -1) endIdx = startIdx + 6000;
-
-  const chunk = html.slice(startIdx, endIdx);
   const rows = chunk.match(/<tr[\s\S]*?<\/tr>/gi) || [];
 
   const profile = {};
@@ -156,23 +174,19 @@ function extractProfileTable(html) {
     if (cells.length < 2) continue;
     const label = stripTags(cells[0]);
     const value = stripFootnoteRefs(stripTags(cells[1]));
-    if (label && value && label.length <= 10 && value.length <= 120) {
+    if (label && value && label.length <= 10 && value.length <= 150) {
       profile[label] = value;
     }
   }
   return Object.keys(profile).length ? sortProfileFields(profile) : null;
 }
 
-/** "SOCIAL" 표에 걸려있는 실제 링크(href)만 도메인으로 구분해서 뽑아냄.
+/** 인포박스 표 안의 실제 링크(href)만 도메인으로 구분해서 뽑아냄.
  *  해시태그처럼 링크가 아닌 텍스트는 대상이 아님 (URL은 사실 정보라 가져와도 문제없음). */
 function extractSocialLinks(html) {
-  const startIdx = html.indexOf("SOCIAL");
-  if (startIdx === -1) return null;
+  const chunk = locateInfoTableChunk(html);
+  if (!chunk) return null;
 
-  let endIdx = html.indexOf("SIGNATURE", startIdx);
-  if (endIdx === -1) endIdx = startIdx + 4000;
-
-  const chunk = html.slice(startIdx, endIdx);
   const hrefs = [...chunk.matchAll(/href=["']([^"']+)["']/gi)].map((m) =>
     decodeEntities(m[1])
   );
