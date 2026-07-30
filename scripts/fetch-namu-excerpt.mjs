@@ -209,6 +209,14 @@ function extractSocialLinks(html) {
       links.twitter = href;
     } else if (/instagram\.com/i.test(href) && !links.instagram) {
       links.instagram = href;
+    } else if (/kick\.com/i.test(href) && !links.kick) {
+      links.kick = href;
+    } else if (/tiktok\.com/i.test(href) && !links.tiktok) {
+      links.tiktok = href;
+    } else if (/discord\.(gg|com)/i.test(href) && !links.discord) {
+      links.discord = href;
+    } else if (/reddit\.com/i.test(href) && !links.reddit) {
+      links.reddit = href;
     }
   }
 

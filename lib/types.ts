@@ -4,7 +4,11 @@ export type Platform =
   | "twitch"
   | "twitter"
   | "afreeca"
-  | "instagram";
+  | "instagram"
+  | "kick"
+  | "tiktok"
+  | "discord"
+  | "reddit";
 
 export interface VtuberEntry {
   id: string;
@@ -15,14 +19,14 @@ export interface VtuberEntry {
   status: "active" | "graduated" | "hiatus";
   tags: string[];
   avatar?: string;
-  color: string;
+  color: string; // 멤버 테마 컬러 (hex) - 카드 포인트에 사용
   platforms: Partial<Record<Platform, string>>;
   views?: number;
   namu: {
     url: string;
     excerpt: string;
     fetchedAt: string | null;
-    profile?: Record<string, string>;
+    profile?: Record<string, string>; // 성별/나이/생일 등 사실 정보 (표 형태)
   };
 }
 
@@ -33,7 +37,7 @@ export interface CommentEntry {
   displayName: string;
   photoURL?: string | null;
   text: string;
-  createdAt: number;
+  createdAt: number; // epoch ms
   votes?: Record<string, 1 | -1>;
 }
 
@@ -49,5 +53,5 @@ export interface RequestEntry {
   twitter?: string;
   namuUrl?: string;
   note?: string;
-  createdAt: number;
+  createdAt: number; // epoch ms
 }
