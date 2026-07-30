@@ -108,24 +108,22 @@ function extractOverviewSectionFallback(html) {
   return cleaned;
 }
 
-/** "PROFILE" 표의 성별/나이/생일 등 사실 정보만 key-value로 추출.
- *  일러스트/서명(SIGNATURE) 이미지는 포함하지 않음. */
+/** 프로필 항목으로 인정할 라벨 목록 (이 이름과 정확히 일치하는 줄만 가져옴).
+ *  표 위치나 모양이 어떻든 상관없이, 이 라벨이 보이면 프로필 정보로 감지함. */
+const PROFILE_LABEL_WHITELIST = new Set([
+  "성별", "종족", "나이", "생일", "생년월일", "신장", "키", "체중", "혈액형",
+  "반려동물", "반려묘", "반려견", "MBTI", "소속", "디자인", "일러스트",
+  "Live2D", "3D 모델", "오시마크", "팬네임", "데뷔", "데뷔일", "데뷔날짜",
+  "국적", "거주", "거주지", "언어", "별명", "취미", "특기",
+  "좋아하는 것", "싫어하는 것", "펜 캐릭터", "팔로워", "구독자",
+]);
+
 const PROFILE_FIELD_ORDER = [
-  "성별",
-  "종족",
-  "나이",
-  "생일",
-  "신장",
-  "반려동물",
-  "반려묘",
-  "반려견",
-  "MBTI",
-  "소속",
-  "디자인",
-  "Live2D",
-  "오시마크",
-  "팬네임",
-  "데뷔",
+  "성별", "종족", "나이", "생일", "생년월일", "신장", "키", "체중", "혈액형",
+  "국적", "거주", "거주지", "언어", "반려동물", "반려묘", "반려견", "MBTI",
+  "소속", "디자인", "일러스트", "Live2D", "3D 모델", "오시마크", "팬네임",
+  "별명", "취미", "특기", "좋아하는 것", "싫어하는 것", "펜 캐릭터",
+  "데뷔", "데뷔일", "데뷔날짜", "팔로워", "구독자",
 ];
 
 function sortProfileFields(profile) {
@@ -139,61 +137,41 @@ function sortProfileFields(profile) {
   return sorted;
 }
 
-/** 인포박스 표 범위를 찾음. "PROFILE" 글자가 있는 템플릿과, 글자 없이
- *  "개요" 제목 바로 앞에 표만 있는 템플릿 둘 다 지원. */
-function locateInfoTableChunk(html) {
-  const profileIdx = html.indexOf("PROFILE");
-  if (profileIdx !== -1) {
-    let endIdx = html.indexOf("SOCIAL", profileIdx);
-    if (endIdx === -1) endIdx = html.indexOf("SIGNATURE", profileIdx);
-    if (endIdx === -1) endIdx = profileIdx + 6000;
-    return html.slice(profileIdx, endIdx);
-  }
-
-  // 폴백: "개요"(id="s-1") 제목 바로 앞에 있는 표를 인포박스로 간주
+/** "개요"(1번 문단) 시작 전까지의 영역만 검색 대상으로 삼음.
+ *  모든 버튜버 문서에서 공통으로 성립하는 유일한 기준이라, 표 이름/위치/모양이
+ *  템플릿마다 달라도 안정적으로 동작함. id="s-1"이 없는 예외적인 문서는
+ *  문서 앞부분 12000자까지를 대신 사용. */
+function getInfoboxSearchWindow(html) {
   const s1Idx = html.search(/id=["']s-1["']/i);
-  if (s1Idx === -1) return null;
-  const tableStart = html.lastIndexOf("<table", s1Idx);
-  if (tableStart === -1) return null;
-  const afterTableStart = html.slice(tableStart);
-  const tableEndRel = afterTableStart.search(/<\/table>/i);
-  if (tableEndRel === -1) return null;
-  const tableEnd = tableStart + tableEndRel + "</table>".length;
-  return html.slice(tableStart, tableEnd);
+  return s1Idx === -1 ? html.slice(0, 12000) : html.slice(0, s1Idx);
 }
 
+/** 표 위치나 이름이 아니라, 라벨 "내용"을 보고 프로필 정보를 감지해서 가져옴. */
 function extractProfileTable(html) {
-  const chunk = locateInfoTableChunk(html);
-  if (!chunk) return null;
-
-  const rows = chunk.match(/<tr[\s\S]*?<\/tr>/gi) || [];
+  const window = getInfoboxSearchWindow(html);
+  const rows = window.match(/<tr[\s\S]*?<\/tr>/gi) || [];
 
   const profile = {};
   for (const row of rows) {
     const cells = row.match(/<t[dh][^>]*>[\s\S]*?<\/t[dh]>/gi) || [];
     if (cells.length < 2) continue;
     const label = stripTags(cells[0]);
+    if (!PROFILE_LABEL_WHITELIST.has(label)) continue;
+    if (label in profile) continue; // 같은 라벨이 여러 번 나오면 먼저 나온 것만 사용
+
     const value = stripFootnoteRefs(stripTags(cells[1]));
-    if (
-      label &&
-      value &&
-      !/^[|\s]+$/.test(value) &&
-      label.length <= 10 &&
-      value.length <= 150
-    ) {
+    if (value && !/^[|\s]+$/.test(value) && value.length <= 150) {
       profile[label] = value;
     }
   }
   return Object.keys(profile).length ? sortProfileFields(profile) : null;
 }
 
-/** 인포박스 표 안의 실제 링크(href)만 도메인으로 구분해서 뽑아냄.
+/** "개요" 이전 영역 안의 실제 링크(href)만 도메인으로 구분해서 뽑아냄.
  *  해시태그처럼 링크가 아닌 텍스트는 대상이 아님 (URL은 사실 정보라 가져와도 문제없음). */
 function extractSocialLinks(html) {
-  const chunk = locateInfoTableChunk(html);
-  if (!chunk) return null;
-
-  const hrefs = [...chunk.matchAll(/href=["']([^"']+)["']/gi)].map((m) =>
+  const window = getInfoboxSearchWindow(html);
+  const hrefs = [...window.matchAll(/href=["']([^"']+)["']/gi)].map((m) =>
     decodeEntities(m[1])
   );
 
