@@ -1,14 +1,20 @@
-// Firestore의 vtubers 컬렉션을 돌면서 나무위키에서 다음 두 가지만 가져와 채워넣는 스크립트.
+// Firestore의 vtubers 컬렉션을 돌면서 나무위키에서 다음 세 가지만 가져와 채워넣는 스크립트.
 // 1. "개요" 섹션 본문 (도입부 한 단락) - 원문 링크/출처 표시와 함께 짧게 노출됨
-// 2. "PROFILE" 표의 사실 정보(성별/나이/생일/신장/MBTI/데뷔일 등) - 사실 데이터라 저작권 대상 아님
+// 2. 프로필 정보(성별/나이/생일/신장/MBTI/데뷔일 등) - 사실 데이터라 저작권 대상 아님.
+//    표(<table>), 정의목록(<dl>), 일반 div 등 어떤 구조로 되어있든 실제 HTML을
+//    파싱해서 "라벨 텍스트가 알려진 이름과 정확히 같은지"로 판단하기 때문에
+//    문서마다 인포박스 템플릿이 달라도 잘 동작함.
+// 3. 방송/SNS 플랫폼 링크 - 마찬가지로 URL 도메인으로 구분해서 가져옴.
 // 캐릭터 일러스트, 서명 이미지, 밈/서술형 본문 등 창작적 표현은 절대 가져오지 않습니다.
 //
 // 로컬에서 테스트하려면 프로젝트 루트에 serviceAccountKey.json을 두고 실행:
 //   npm run fetch-namu
+// (최초 1회 `npm install cheerio --save-dev` 필요 - package.json에 이미 추가되어 있음)
 
 import { readFile } from "fs/promises";
 import { initializeApp, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import * as cheerio from "cheerio";
 
 const EXCERPT_MAX_LEN = 220;
 const OVERVIEW_MAX_LEN = 500;
@@ -18,98 +24,10 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function decodeEntities(str) {
-  return str
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
-    .replace(/&#(\d+);/g, (_, num) => String.fromCodePoint(parseInt(num, 10)))
-    .replace(/&quot;/g, '"')
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&nbsp;/g, " ");
-}
-
-// "150cm[1]" 처럼 남는 각주 번호 표시를 제거
 function stripFootnoteRefs(str) {
   return str.replace(/\s*\[\d+\]\s*/g, " ").replace(/\s+/g, " ").trim();
 }
 
-function stripTags(html) {
-  return decodeEntities(
-    html
-      .replace(/<sup[\s\S]*?<\/sup>/gi, " ") // 각주 번호 제거
-      .replace(/<script[\s\S]*?<\/script>/gi, " ")
-      .replace(/<style[\s\S]*?<\/style>/gi, " ")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/\s+/g, " ")
-  ).trim();
-}
-
-function extractOgDescription(html) {
-  const metaTags = html.match(/<meta[^>]+>/gi) || [];
-  for (const tag of metaTags) {
-    if (/property=["']og:description["']/i.test(tag)) {
-      const m = tag.match(/content=["']([^"']*)["']/i);
-      if (m && m[1].trim()) return decodeEntities(m[1].trim());
-    }
-  }
-  return null;
-}
-
-function extractOverviewSection(html) {
-  const startMarker = html.search(/id=["']s-1["']/i);
-  const endMarker = html.search(/id=["']s-2["']/i);
-  if (startMarker === -1 || endMarker === -1 || endMarker <= startMarker) {
-    return extractOverviewSectionFallback(html);
-  }
-
-  // 시작: "개요" 제목 태그(<h2>...</h2> 등) 전체가 끝나는 지점부터
-  // (제목 마커 앵커, 제목 글자, [편집] 링크까지 전부 건너뜀)
-  const afterStart = html.slice(startMarker);
-  const headingCloseMatch = afterStart.match(/<\/h[1-6]>/i);
-  const contentStart = headingCloseMatch
-    ? startMarker + headingCloseMatch.index + headingCloseMatch[0].length
-    : startMarker;
-
-  // 끝: 다음 제목 태그가 "시작"하는 지점 (그 제목의 글자가 아예 포함 안 되게)
-  const endTagOpen = html.lastIndexOf("<", endMarker);
-  const contentEnd = endTagOpen === -1 ? endMarker : endTagOpen;
-
-  if (contentEnd <= contentStart) return extractOverviewSectionFallback(html);
-
-  const cleaned = stripTags(html.slice(contentStart, contentEnd)).trim();
-  if (cleaned.length < 5) return extractOverviewSectionFallback(html);
-  return cleaned;
-}
-
-// id="s-1"/"s-2" 마커가 없는 예외적인 페이지를 위한 예전 방식 폴백
-function extractOverviewSectionFallback(html) {
-  const startIdx = html.search(/section=1["']/i);
-  const endMatchIdx = html.search(/section=2["']/i);
-  if (startIdx === -1 || endMatchIdx === -1 || endMatchIdx <= startIdx) {
-    return null;
-  }
-
-  const afterStart = html.slice(startIdx);
-  const anchorCloseIdx = afterStart.search(/<\/a>/i);
-  if (anchorCloseIdx === -1) return null;
-  const contentStart = startIdx + anchorCloseIdx + 4;
-
-  // 태그 중간에서 안 잘리도록, 그 태그가 "시작"하는 지점까지만 사용
-  const tagStart = html.lastIndexOf("<", endMatchIdx);
-  const contentEnd = tagStart === -1 ? endMatchIdx : tagStart;
-  if (contentEnd <= contentStart) return null;
-
-  const cleaned = stripTags(html.slice(contentStart, contentEnd))
-    .replace(/\s*\d+\.\s*\S*\s*$/, "") // 다음 제목 번호/제목 잔여물 제거
-    .trim();
-
-  if (cleaned.length < 5) return null;
-  return cleaned;
-}
-
-/** 프로필 항목으로 인정할 라벨 목록 (이 이름과 정확히 일치하는 줄만 가져옴).
- *  표 위치나 모양이 어떻든 상관없이, 이 라벨이 보이면 프로필 정보로 감지함. */
 const PROFILE_LABEL_WHITELIST = new Set([
   "성별", "종족", "나이", "생일", "생년월일", "별자리", "신장", "키", "체중", "혈액형",
   "반려동물", "반려묘", "반려견", "MBTI", "소속", "디자인", "일러스트", "일러스트레이터",
@@ -137,37 +55,62 @@ function sortProfileFields(profile) {
   return sorted;
 }
 
-/** 라벨 "내용"을 보고 프로필 정보를 감지해서 가져옴 (표 위치/이름/모양 무관).
- *  문서 전체를 훑되, 같은 라벨이 여러 번 나오면 먼저 나온 것만 사용하기 때문에
- *  본문 뒤쪽에 우연히 같은 이름의 표가 있어도 실제 인포박스 값이 우선됨. */
-function extractProfileTable(html) {
-  const rows = html.match(/<tr[\s\S]*?<\/tr>/gi) || [];
+function cleanText($, el) {
+  return $(el).text().replace(/\s+/g, " ").trim();
+}
 
+/** 표든 정의목록(dl)이든 일반 div든, 라벨 텍스트가 화이트리스트와
+ *  정확히 일치하면 그 "다음 형제 요소"를 값으로 취급해서 프로필 정보를 감지함. */
+function extractProfile($) {
   const profile = {};
-  for (const row of rows) {
-    const cells = row.match(/<t[dh][^>]*>[\s\S]*?<\/t[dh]>/gi) || [];
-    if (cells.length < 2) continue;
-    const label = stripTags(cells[0]);
-    if (!PROFILE_LABEL_WHITELIST.has(label)) continue;
-    if (label in profile) continue; // 같은 라벨이 여러 번 나오면 먼저 나온 것만 사용
 
-    const value = stripFootnoteRefs(stripTags(cells[1]));
+  // 1) 표 구조 (<tr><td>라벨</td><td>값</td></tr>)
+  $("tr").each((_, tr) => {
+    const cells = $(tr).children("td, th");
+    if (cells.length < 2) return;
+    const label = cleanText($, cells[0]);
+    if (!PROFILE_LABEL_WHITELIST.has(label) || label in profile) return;
+    const value = stripFootnoteRefs(cleanText($, cells[1]));
     if (value && !/^[|\s]+$/.test(value) && value.length <= 150) {
       profile[label] = value;
     }
-  }
+  });
+
+  // 2) 정의목록 구조 (<dt>라벨</dt><dd>값</dd>)
+  $("dt").each((_, dt) => {
+    const label = cleanText($, dt);
+    if (!PROFILE_LABEL_WHITELIST.has(label) || label in profile) return;
+    const dd = $(dt).next("dd");
+    if (!dd.length) return;
+    const value = stripFootnoteRefs(cleanText($, dd));
+    if (value && !/^[|\s]+$/.test(value) && value.length <= 150) {
+      profile[label] = value;
+    }
+  });
+
+  // 3) 그 외 일반적인 형태 (라벨 요소 바로 다음 형제 요소가 값인 경우) - 폴백
+  $("*").each((_, el) => {
+    const $el = $(el);
+    if ($el.children().length > 0) return; // 하위 요소가 있으면 라벨 후보 아님
+    const label = cleanText($, el);
+    if (!PROFILE_LABEL_WHITELIST.has(label) || label in profile) return;
+    const sib = $el.next();
+    if (!sib.length) return;
+    const value = stripFootnoteRefs(cleanText($, sib));
+    if (value && !/^[|\s]+$/.test(value) && value.length <= 150) {
+      profile[label] = value;
+    }
+  });
+
   return Object.keys(profile).length ? sortProfileFields(profile) : null;
 }
 
-/** 실제 링크(href)만 도메인으로 구분해서 뽑아냄. 마찬가지로 먼저 나온 것만 사용.
+/** 실제 링크(href)만 도메인으로 구분해서 뽑아냄. 먼저 나온 것만 사용.
  *  해시태그처럼 링크가 아닌 텍스트는 대상이 아님 (URL은 사실 정보라 가져와도 문제없음). */
-function extractSocialLinks(html) {
-  const hrefs = [...html.matchAll(/href=["']([^"']+)["']/gi)].map((m) =>
-    decodeEntities(m[1])
-  );
-
+function extractSocialLinks($) {
   const links = {};
-  for (const href of hrefs) {
+  $("a[href]").each((_, a) => {
+    const href = $(a).attr("href") || "";
     if (/youtube\.com|youtu\.be/i.test(href) && !links.youtube) {
       links.youtube = href;
     } else if (/chzzk\.naver\.com/i.test(href) && !links.chzzk) {
@@ -187,9 +130,33 @@ function extractSocialLinks(html) {
     } else if (/reddit\.com/i.test(href) && !links.reddit) {
       links.reddit = href;
     }
+  });
+  return Object.keys(links).length ? links : null;
+}
+
+/** "개요" 섹션(id="s-1" 제목 ~ id="s-2" 제목 사이) 본문만 추출. */
+function extractOverview($) {
+  const heading = $('[id="s-1"]').closest("h1,h2,h3,h4,h5,h6");
+  if (!heading.length) return null;
+
+  const parts = [];
+  let node = heading.next();
+  let guard = 0;
+  while (node.length && guard < 200) {
+    guard++;
+    if (node.is("h1,h2,h3,h4,h5,h6") || node.find('[id="s-2"]').length) break;
+    const text = cleanText($, node);
+    if (text) parts.push(text);
+    node = node.next();
   }
 
-  return Object.keys(links).length ? links : null;
+  const joined = parts.join(" ").trim();
+  return joined.length >= 5 ? joined : null;
+}
+
+function extractOgDescription($) {
+  const content = $('meta[property="og:description"]').attr("content");
+  return content && content.trim() ? content.trim() : null;
 }
 
 async function fetchNamuData(namuUrl) {
@@ -207,25 +174,26 @@ async function fetchNamuData(namuUrl) {
     return null;
   }
   const html = await res.text();
+  const $ = cheerio.load(html);
 
-  let excerpt = extractOverviewSection(html);
+  let excerpt = extractOverview($);
   if (excerpt) {
     excerpt = excerpt.slice(0, OVERVIEW_MAX_LEN);
   } else {
-    const ogDesc = extractOgDescription(html);
+    const ogDesc = extractOgDescription($);
     if (ogDesc) {
       excerpt = ogDesc.slice(0, EXCERPT_MAX_LEN);
     } else {
-      const cleaned = stripTags(html).replace(
+      const bodyText = cleanText($, $("body")).replace(
         /이 저작물은 CC BY-NC-SA.*?위키위키입니다\./g,
         ""
       );
-      excerpt = cleaned ? cleaned.slice(0, EXCERPT_MAX_LEN) : null;
+      excerpt = bodyText ? bodyText.slice(0, EXCERPT_MAX_LEN) : null;
     }
   }
 
-  const profile = extractProfileTable(html);
-  const socialLinks = extractSocialLinks(html);
+  const profile = extractProfile($);
+  const socialLinks = extractSocialLinks($);
 
   return { excerpt, profile, socialLinks };
 }
